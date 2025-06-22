@@ -7,7 +7,7 @@ const Footer = () => {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
-            <h3 className="text-lg font-semibold mb-4">IntelliSearch</h3>
+            <h3 className="text-lg font-semibold mb-4">InovGenius</h3>
             <p className="text-sm">
               A powerful search engine with AI capabilities.
             </p>
