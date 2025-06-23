@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { motion, AnimatePresence } from 'framer-motion';
+
 import SearchBar from '../components/SearchBar';
 import SearchResults from '../components/SearchResults';
 import api from '../services/api';
@@ -10,12 +13,39 @@ const Search = () => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchType, setSearchType] = useState('text');
+  const [showFilters, setShowFilters] = useState(true);
   const [filters, setFilters] = useState({
     date: 'any',
     type: 'all',
     domain: '',
-    language: 'fr'
+    language: 'fr',
   });
+
+  const performSearch = useCallback(async (searchQuery, type = 'text') => {
+    if (!searchQuery.trim()) return;
+
+    setLoading(true);
+    try {
+      const response = await api.post('/search', {
+        query: searchQuery,
+        type,
+        filters,
+      });
+
+      const dataMap = {
+        text: response.data.results || [],
+        image: response.data.images || [],
+        news: response.data.news || [],
+      };
+
+      setResults(dataMap[type] || []);
+    } catch (error) {
+      console.error('Search error:', error);
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -27,41 +57,13 @@ const Search = () => {
       setSearchType(type);
       performSearch(q, type);
     }
-  }, [location.search]);
+  }, [location.search, performSearch]);
 
   useEffect(() => {
     if (query.trim()) {
       performSearch(query, searchType);
     }
-  }, [searchType]);
-
-  const performSearch = async (searchQuery, type = 'text') => {
-    if (!searchQuery.trim()) return;
-
-    setLoading(true);
-    try {
-      const response = await api.post('/search', {
-        query: searchQuery,
-        type,
-        filters
-      });
-
-      if (type === 'text') {
-        setResults(response.data.results || []);
-      } else if (type === 'image') {
-        setResults(response.data.images || []);
-      } else if (type === 'news') {
-        setResults(response.data.news || []);
-      } else {
-        setResults([]);
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [searchType, query, performSearch]);
 
   const handleSearch = (searchQuery) => {
     setQuery(searchQuery);
@@ -78,92 +80,128 @@ const Search = () => {
   };
 
   return (
-    <div className="py-8">
+    <div className="pt-24 pb-10 min-h-screen">
       <div className="container mx-auto px-4">
-        <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-6 text-center text-primary dark:text-white">
+          InovGenius
+        </h1>
+
+        <div className="mb-6">
           <SearchBar initialQuery={query} onSearch={handleSearch} />
         </div>
 
+        {/* Bouton toujours visible pour afficher/cacher les filtres */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-1 text-primary dark:text-white font-medium hover:underline"
+          >
+            {showFilters ? 'Cacher les filtres' : 'Afficher les filtres'}
+            {showFilters ? (
+              <ChevronUpIcon className="h-5 w-5 transition-transform" />
+            ) : (
+              <ChevronDownIcon className="h-5 w-5 transition-transform" />
+            )}
+          </button>
+        </div>
+
         <div className="flex flex-col md:flex-row gap-6">
-          <div className="md:w-1/4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sticky top-4">
-              <h3 className="text-lg font-semibold mb-4">Filters</h3>
+          {/* Filtres animés avec Framer Motion */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                key="filters"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="md:w-1/4"
+              >
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sticky top-24">
+                  <h3 className="text-lg font-semibold mb-4 text-primary dark:text-white">Filtres</h3>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search Type</label>
-                <select
-                  value={searchType}
-                  onChange={(e) => setSearchType(e.target.value)}
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                >
-                  <option value="text">Text</option>
-                  <option value="image">Images</option>
-                  <option value="news">News</option>
-                </select>
-              </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Type de recherche
+                    </label>
+                    <select
+                      value={searchType}
+                      onChange={(e) => setSearchType(e.target.value)}
+                      className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary focus:ring-primary"
+                    >
+                      <option value="text">Texte</option>
+                      <option value="image">Images</option>
+                      <option value="news">Actualités</option>
+                    </select>
+                  </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
-                <select
-                  value={filters.date}
-                  onChange={(e) => handleFilterChange('date', e.target.value)}
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                >
-                  <option value="any">Any time</option>
-                  <option value="day">Last day</option>
-                  <option value="week">Last week</option>
-                  <option value="month">Last month</option>
-                  <option value="year">Last year</option>
-                </select>
-              </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
+                    <select
+                      value={filters.date}
+                      onChange={(e) => handleFilterChange('date', e.target.value)}
+                      className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary focus:ring-primary"
+                    >
+                      <option value="any">Toutes</option>
+                      <option value="day">Dernier jour</option>
+                      <option value="week">Dernière semaine</option>
+                      <option value="month">Dernier mois</option>
+                      <option value="year">Dernière année</option>
+                    </select>
+                  </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content Type</label>
-                <select
-                  value={filters.type}
-                  onChange={(e) => handleFilterChange('type', e.target.value)}
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                >
-                  <option value="all">All types</option>
-                  <option value="article">Articles</option>
-                  <option value="video">Videos</option>
-                  <option value="image">Images</option>
-                  <option value="document">Documents</option>
-                </select>
-              </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Type de contenu
+                    </label>
+                    <select
+                      value={filters.type}
+                      onChange={(e) => handleFilterChange('type', e.target.value)}
+                      className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary focus:ring-primary"
+                    >
+                      <option value="all">Tous</option>
+                      <option value="article">Articles</option>
+                      <option value="video">Vidéos</option>
+                      <option value="image">Images</option>
+                      <option value="document">Documents</option>
+                    </select>
+                  </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Language</label>
-                <select
-                  value={filters.language}
-                  onChange={(e) => handleFilterChange('language', e.target.value)}
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                >
-                  <option value="fr">French</option>
-                  <option value="en">English</option>
-                  <option value="es">Spanish</option>
-                  <option value="de">German</option>
-                  <option value="it">Italian</option>
-                </select>
-              </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Langue</label>
+                    <select
+                      value={filters.language}
+                      onChange={(e) => handleFilterChange('language', e.target.value)}
+                      className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary focus:ring-primary"
+                    >
+                      <option value="fr">Français</option>
+                      <option value="en">Anglais</option>
+                      <option value="es">Espagnol</option>
+                      <option value="de">Allemand</option>
+                      <option value="it">Italien</option>
+                    </select>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Domain</label>
-                <input
-                  type="text"
-                  value={filters.domain}
-                  onChange={(e) => handleFilterChange('domain', e.target.value)}
-                  placeholder="example.com"
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-              </div>
-            </div>
-          </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Domaine</label>
+                    <input
+                      type="text"
+                      value={filters.domain}
+                      onChange={(e) => handleFilterChange('domain', e.target.value)}
+                      placeholder="ex: example.com"
+                      className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          <div className="md:w-3/4">
+          {/* Résultats */}
+          <div className={`w-full ${showFilters ? 'md:w-3/4' : ''}`}>
             {loading ? (
               <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
               </div>
             ) : (
               <SearchResults

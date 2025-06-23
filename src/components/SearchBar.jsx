@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  MagnifyingGlassIcon, 
-  XMarkIcon, 
-  MicrophoneIcon,
-  SpeakerWaveIcon,
-  SpeakerXMarkIcon
-} from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, XMarkIcon, MicrophoneIcon } from '@heroicons/react/24/outline';
 import api from '../services/api';
 import InovLogo from '../assets/Inov.png';
 
@@ -15,16 +9,16 @@ const SearchBar = ({ initialQuery = '', onSearch }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [hasSpeechSupport, setHasSpeechSupport] = useState(false);
+  const [browserSupportsSpeech, setBrowserSupportsSpeech] = useState(false);
   const recognitionRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Vérifier la compatibilité de la reconnaissance vocale
-    setHasSpeechSupport('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
-    
-    if (hasSpeechSupport) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    setQuery(initialQuery);
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      setBrowserSupportsSpeech(true);
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
@@ -33,12 +27,19 @@ const SearchBar = ({ initialQuery = '', onSearch }) => {
       recognitionRef.current.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         setQuery(transcript);
-        handleVoiceSearch(transcript);
+        setIsListening(false);
+        setTimeout(() => {
+          navigate(`/search?q=${encodeURIComponent(transcript)}`);
+          if (onSearch) onSearch(transcript);
+        }, 300);
       };
 
       recognitionRef.current.onerror = (event) => {
         console.error('Speech recognition error', event.error);
         setIsListening(false);
+        if (event.error === 'not-allowed') {
+          alert("Veuillez autoriser l'accès au microphone pour utiliser la reconnaissance vocale.");
+        }
       };
 
       recognitionRef.current.onend = () => {
@@ -47,15 +48,9 @@ const SearchBar = ({ initialQuery = '', onSearch }) => {
     }
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+      if (recognitionRef.current) recognitionRef.current.stop();
     };
-  }, [hasSpeechSupport]);
-
-  useEffect(() => {
-    setQuery(initialQuery);
-  }, [initialQuery]);
+  }, [initialQuery, navigate, onSearch]);
 
   const handleInputChange = (e) => {
     const value = e.target.value;
@@ -82,9 +77,7 @@ const SearchBar = ({ initialQuery = '', onSearch }) => {
     e.preventDefault();
     if (query.trim()) {
       navigate(`/search?q=${encodeURIComponent(query)}`);
-      if (onSearch) {
-        onSearch(query);
-      }
+      if (onSearch) onSearch(query);
       setShowSuggestions(false);
     }
   };
@@ -92,9 +85,7 @@ const SearchBar = ({ initialQuery = '', onSearch }) => {
   const handleSuggestionClick = (suggestion) => {
     setQuery(suggestion);
     navigate(`/search?q=${encodeURIComponent(suggestion)}`);
-    if (onSearch) {
-      onSearch(suggestion);
-    }
+    if (onSearch) onSearch(suggestion);
     setShowSuggestions(false);
   };
 
@@ -104,8 +95,8 @@ const SearchBar = ({ initialQuery = '', onSearch }) => {
     setShowSuggestions(false);
   };
 
-  const toggleVoiceSearch = () => {
-    if (!hasSpeechSupport) {
+  const toggleVoiceRecognition = () => {
+    if (!browserSupportsSpeech) {
       alert("La reconnaissance vocale n'est pas supportée par votre navigateur");
       return;
     }
@@ -113,76 +104,96 @@ const SearchBar = ({ initialQuery = '', onSearch }) => {
     if (isListening) {
       recognitionRef.current.stop();
     } else {
-      recognitionRef.current.start();
-      setIsListening(true);
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error('Error starting voice recognition:', error);
+        setIsListening(false);
+      }
     }
-  };
-
-  const handleVoiceSearch = (transcript) => {
-    setQuery(transcript);
-    navigate(`/search?q=${encodeURIComponent(transcript)}`);
-    if (onSearch) {
-      onSearch(transcript);
-    }
-    setShowSuggestions(false);
   };
 
   return (
-    <div className="relative w-full max-w-3xl mx-auto">
-      <form onSubmit={handleSubmit}>
-        <div className="relative flex items-center bg-white dark:bg-gray-800 rounded-full shadow-lg border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
-          {/* Logo InovGenius */}
-          <div className="pl-3 flex items-center">
-            <img 
-              src={InovLogo} 
-              alt="InovGenius" 
-              className="h-8 w-8 rounded-full object-cover"
-            />
-          </div>
+    <div className="relative w-full max-w-2xl mx-auto px-4">
+      <form onSubmit={handleSubmit} className="w-full">
+        <div className="relative flex items-center w-full">
+          {/* Logo rond */}
+          <img
+            src={InovLogo}
+            alt="Logo"
+            className="absolute left-3 h-6 w-6 rounded-full object-cover"
+          />
 
+          {/* Champ de recherche */}
           <input
             type="text"
             value={query}
             onChange={handleInputChange}
-            placeholder="Recherchez avec InovGenius..."
-            className="flex-1 py-4 px-4 bg-transparent focus:outline-none text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+            placeholder="Rechercher..."
+            className="
+              w-full pl-12 pr-28 py-3 rounded-full
+              border border-gray-300
+              bg-white text-gray-900
+              placeholder-gray-400
+              focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary
+              transition-all duration-200
+              dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500
+            "
             onFocus={() => query.length > 2 && setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+            autoComplete="off"
+            aria-label="Barre de recherche"
           />
 
+          {/* Bouton effacer */}
           {query && (
             <button
               type="button"
               onClick={clearSearch}
-              className="absolute right-16 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              className="
+                absolute right-20 sm:right-24
+                text-gray-400 hover:text-gray-600
+                dark:text-gray-400 dark:hover:text-gray-300
+                transition-colors duration-200
+                focus:outline-none focus:ring-2 focus:ring-primary rounded
+              "
               aria-label="Effacer la recherche"
             >
               <XMarkIcon className="h-5 w-5" />
             </button>
           )}
 
-          {/* Bouton recherche vocale */}
-          {hasSpeechSupport && (
+          {/* Bouton microphone */}
+          {browserSupportsSpeech && (
             <button
               type="button"
-              onClick={toggleVoiceSearch}
-              className={`p-2 mr-2 rounded-full ${isListening 
-                ? 'text-red-500 animate-pulse' 
-                : 'text-gray-500 hover:text-blue-600 dark:hover:text-purple-400'
-              } transition-colors`}
+              onClick={toggleVoiceRecognition}
+              className={`
+                absolute right-10 sm:right-14 p-2 rounded-full
+                focus:outline-none focus:ring-2 focus:ring-primary
+                transition-colors duration-200
+                ${isListening ? 'text-red-500 animate-pulse' : 'text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300'}
+              `}
               aria-label={isListening ? "Arrêter l'écoute" : "Recherche vocale"}
             >
-              {isListening ? (
-                <SpeakerWaveIcon className="h-5 w-5" />
-              ) : (
-                <MicrophoneIcon className="h-5 w-5" />
-              )}
+              <MicrophoneIcon className="h-5 w-5" />
             </button>
           )}
 
+          {/* Bouton recherche */}
           <button
             type="submit"
-            className="m-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-2 rounded-full hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            className="
+              absolute right-2
+              bg-primary text-white
+              dark:bg-primary-dark
+              p-2 rounded-full
+              hover:bg-blue-700
+              dark:hover:bg-blue-600
+              focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-primary-dark
+              transition-colors duration-200
+            "
             aria-label="Rechercher"
           >
             <MagnifyingGlassIcon className="h-5 w-5" />
@@ -190,27 +201,42 @@ const SearchBar = ({ initialQuery = '', onSearch }) => {
         </div>
       </form>
 
+      {/* Suggestions */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-10 mt-2 w-full bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <ul className="py-2">
+        <div className="
+          absolute z-10 mt-1 w-full
+          bg-white dark:bg-gray-800
+          rounded-md shadow-lg
+          max-h-60 overflow-y-auto
+          ring-1 ring-black ring-opacity-5
+        ">
+          <ul className="py-1" role="listbox" aria-label="Suggestions de recherche">
             {suggestions.map((suggestion, index) => (
               <li
                 key={index}
-                className="px-4 py-3 hover:bg-blue-50 dark:hover:bg-gray-700 cursor-pointer flex items-center transition-colors"
+                className="
+                  px-4 py-2
+                  cursor-pointer
+                  hover:bg-gray-100 dark:hover:bg-gray-700
+                  text-gray-900 dark:text-gray-100
+                  transition-colors duration-200
+                  select-none
+                "
                 onClick={() => handleSuggestionClick(suggestion)}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleSuggestionClick(suggestion);
+                  }
+                }}
+                role="option"
+                aria-selected="false"
               >
-                <MagnifyingGlassIcon className="h-4 w-4 text-gray-400 mr-3" />
-                <span className="text-gray-800 dark:text-gray-200">{suggestion}</span>
+                {suggestion}
               </li>
             ))}
           </ul>
-        </div>
-      )}
-
-      {isListening && (
-        <div className="absolute top-full mt-2 left-0 right-0 bg-blue-100 dark:bg-gray-700 text-blue-800 dark:text-white p-3 rounded-lg flex items-center shadow-md">
-          <SpeakerWaveIcon className="h-5 w-5 mr-2 animate-pulse" />
-          <span>Parlez maintenant... InovGenius vous écoute</span>
         </div>
       )}
     </div>

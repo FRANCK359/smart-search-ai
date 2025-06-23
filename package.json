@@ -36,6 +36,7 @@
     "react-tsparticles": "^2.12.2",
     "react-vertical-timeline-component": "^3.5.3",
     "recharts": "^2.15.3",
+    "swiper": "^11.2.8",
     "tailwindcss": "^3.3.3",
     "tsparticles": "^3.8.1",
     "tsparticles-slim": "^2.12.0",

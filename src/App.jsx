@@ -18,7 +18,7 @@ import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import AdminMessages from './pages/AdminMessages';
 import Profile from './components/Auth/Profile';
-
+import Documentation from './pages/Documentation';
 function App() {
   return (
     <ThemeProvider>
@@ -31,6 +31,7 @@ function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/about" element={<About />} />
+                 <Route path="/documentation" element={<Documentation />} /> {/* ← ICI */}
                 <Route path="/news" element={<News />} />
                 <Route path="/api" element={<ApiDocs />} />
                 <Route path="/faq" element={<Faq />} />
